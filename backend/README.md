@@ -1,0 +1,81 @@
+# RAG Multi-Agent System — Backend (Step 1)
+
+FastAPI backend skeleton with a pluggable LLM provider layer and an
+abstract `BaseAgent` foundation for the multi-agent pipeline.
+
+## What's included in this step
+
+- `app/config.py` — environment-driven settings via `pydantic-settings`.
+- `app/services/llm_provider.py` — `BaseLLMProvider` abstraction with OpenAI / Anthropic implementations and automatic retry/backoff.
+- `app/services/logging_service.py` — structured logging (JSON in prod, pretty in dev).
+- `app/agents/base_agent.py` — abstract base class every agent inherits from.
+- `app/models/schemas.py` + `domain.py` — Pydantic API contracts and internal entities.
+- `app/api/routes/health.py` + `chat.py` — health check and a placeholder chat endpoint that exercises the LLM provider end-to-end.
+- Tests for `/health` and `BaseAgent` (with a mock provider — no API key needed).
+- Dockerfile, pyproject.toml, .env.example.
+
+## Run locally
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate    # or .venv\Scripts\activate on Windows
+pip install -r requirements.txt
+cp .env.example .env                                 # then edit and set OPENAI_API_KEY
+uvicorn app.main:app --reload --port 8000
+```
+
+Open http://localhost:8000/docs for Swagger UI.
+
+## Run tests
+
+```bash
+pytest -q
+```
+
+The unit tests for `BaseAgent` use a mock LLM provider, so they run without
+any API keys or network access.
+
+## Run with Docker
+
+```bash
+docker build -t rag-backend .
+docker run --rm -p 8000:8000 --env-file .env rag-backend
+```
+
+## Step 2 — RAG ingestion + ChromaDB
+
+**New modules:**
+- `app/rag/embeddings.py` — `BaseEmbedder` with `SentenceTransformerEmbedder` (default) and `OpenAIEmbedder`.
+- `app/rag/chunking.py` — `TextChunker` with configurable `chunk_size` / `chunk_overlap`, deterministic chunk IDs.
+- `app/rag/vector_store.py` — `ChromaVectorStore` with persistent storage + cosine similarity.
+- `app/rag/retriever.py` — semantic retriever façade composing embedder + vector store.
+- `app/rag/ingestion_pipeline.py` — `load → chunk → embed → store` pipeline (txt / md / pdf).
+
+**New endpoints:**
+- `POST /ingest/text` — submit raw text.
+- `POST /ingest/file` — upload `.txt`, `.md`, or `.pdf`.
+- `GET  /ingest/stats` — collection size + embedding info.
+- `DELETE /ingest` — reset the collection (dev only).
+
+**Try it:**
+
+```bash
+# Submit text
+curl -X POST http://localhost:8000/ingest/text \
+  -H "Content-Type: application/json" \
+  -d '{"text":"RAG = Retrieval Augmented Generation.","source":"intro.txt"}'
+
+# Upload a file
+curl -X POST http://localhost:8000/ingest/file -F "file=@my_doc.pdf"
+
+# Inspect the collection
+curl http://localhost:8000/ingest/stats
+```
+
+**Tests:** new tests use a deterministic `HashEmbedder` + in-memory vector store
+(see `tests/conftest.py`) so the suite runs offline with no model downloads.
+
+## Next step
+
+**Step 3** — Single agent end-to-end (Researcher only): bring `BaseAgent`,
+the retriever, and the LLM provider together in one working pipeline.
