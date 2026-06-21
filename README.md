@@ -1,4 +1,4 @@
-# [cite_start]Agentic LLM Creation and Monitoring [cite: 3]
+# Agentic LLM Creation and Monitoring 
 
 [cite_start]A Retrieval-Augmented, Multi-Agent Question-Answering System with Independent Guardrail Monitoring and Offline Evaluation. [cite: 4]
 
